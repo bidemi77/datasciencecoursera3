@@ -1,0 +1,262 @@
+libname mydata 'scs/crb519/PREDICT_410/SAS_DATA/'access=readonly;
+proc contents data = mydata.dog_mandible_measurements; run; quit;
+proc print data = mydata.dog_mandible_measurements;run;quit;
+
+* list out class names and counts;
+proc freq data = mydata.doog_mandible_measurements;
+tables group_name;
+run; quit;
+* note that we have 5 cclasses of dogs, 10 if we would count type of dogs and gender;
+
+* Strip off class identifiers for clustering;
+data measurements;
+    set mydata.dog_mandible_measurements(keep=X);
+run;
+
+proc print data=measurements; run; quit;
+
+
+* Perform cluster analysis using PROC CLUSTER;
+ods graphics on;
+proc cluster data=measurements method=average outtree=tree1;
+run; quit;
+ods graphics off;
+
+* Pull results for 5 Clusters using PROC TREE;
+ods graphics on;
+proc tree data=tree1 nc1=5  out=_5_clusters;
+copy X: ;
+run; quit;
+ods graphics off;
+
+proc print data=_5_clusters; run; quit;
+
+proc freq data = _5_clusters;
+tables clusname;
+run; quit;
+
+proc sort data=_5_clusters; by X1-X9; run; quit;
+proc sort data= mydata.dog_mandible_measurements out=class_labels; by X1-X9; run; quit;
+
+data cluster_fit5;
+    merge class_labels_5_clusters;
+    by X1-X9;
+run;
+
+* Formalize the cluster fits and their accuracy.
+data predicts5;
+    set cluster_fit5;
+    format predicted_group $20. ;
+
+    if (clusname='CL10') then predicted_group='Golden Jackal';
+    else if (clusname in ('CL12', 'CL8', 'OB58')) then predicted_group='Indian Wolves';
+    else if (clusname='CL5') then predicted_groups ='Cuons' ;
+    else predicted_group ='Error';
+   * Note that we are only predicting three of the five groups when using five clusters;
+   * Note that the individual observations are essentially clustering outliers for the 
+   given number of clusters. They are far enough away from the observations that  they are 
+   given their own cluster;
+
+    if (predicted group=group_name) then correct_prediction=1;
+    else correct_prediction=0;
+run;
+
+* Check predicted group assignment for ERROR;
+proc freq data=predict5;
+tables predicted_group;
+run; quit;
+
+proc means data=predict5 mean noprint;
+var correct_prediction;
+output out=prediction_accuracy5
+    sum(correct_prediction)=count_accurate
+    mean(correct_prediction)=pct_accurate;
+run; quit;
+
+proc print data= prediction_accuracy5; run; quit;
+
+data predict10;
+    set cluster _fit10;
+    format predicted_group $20. ;
+
+    if (clusname='CL10') then predicted_group='Golden Jackal';
+    else if (clusname='CL11') then predicted_group = 'Prehistoric';
+    else if (clusname in ('CL12', 'CL17', 'OB58', 'OB65')) then predicted_group='Indian Wolves';
+    else if (clusname='CL15') then predicted_group = 'MOdern';
+    else predicted_group='Error';
+
+* Now we are predicting all five of the groups then correct prediction=1;
+run;
+
+
+* Check predicted_group assignment  for ERROR;
+proc freq data= predict10 mean no print;
+var correct _prediction;
+tables predicted_group;
+run; quit;
+
+proc means data=predict10 mean noprint;
+var correct_prediction;
+output out=prediction_accuracy10;
+    sum(correct_prediction)= count_accurate;
+    mean(correct_prediction)=pct_accuarate;
+run; quit;
+
+proc print dat=prediction_accuracy10; run; quit;
+
+* Prediction Accuracy for 5 Clusters = 0.63636;
+* Prediction Accuracy  for 10 Clusters = 0.74026;
+
+* How can we improve this (unsupervised) cluster analysis;
+
+/* 
+(1) W e didi not standardize the attributes (or viable measurements). When the attributes are not standaradized, then the 
+clustering algorithm will focus on the variables of largest magnitude .
+
+(2) We did not reduce the dimension of our problem. Cluster analysis works best in lower dimensions. Points get far apart quickly as the dimension of the attribute space grows.
+*/
+
+
+# Dog Mandible Part 2 
+ proc print data =measurements; run; quit;
+
+*Standardize the data measurements using PROC STANDARD;
+
+
+proc standard data=measurements out=std_measurements
+    mean= 0 std=1 noprint;
+run; quit;
+
+proc print data=std_measurements; run; quit;
+
+data n_measurements;
+    set mydata.dog_mandible_measurements;
+    n = _n_;
+
+    rename = X1=rX1 X2=rX2 X3=rX3 X4=rXr4 X5=rX5 X6=rX6 X7=rX7 X8=rX8 X9=rX9;
+run;
+
+
+data n_std_measurements;
+    set std_measurements;
+    n = _n_;
+run;
+
+proc sort data=n_measurements; by n; run; quit;
+proc sort data=n_std_measurements; by n; run; quit;
+
+
+data cluster_fit5;
+     merge class_labels_5_clusters;
+     by X1-X9;
+run;
+
+proc freq data=cluster fit5;
+tables clusname*group_name;
+run; quit;
+
+* Pull results for 10 clusters using PROC TREE;
+Note that with hierarachcall clustering we do not need to refit the clustering algorithm.
+All sets of clusters have already been fit.
+
+
+ods graphhics on;
+proc tree data=tree1 nc1=10 out=_10_clusters;
+copy X:;
+ru; quit;
+ods graphics off;
+
+
+proc print data = _10_clusters; run; quit;
+
+*******************************************************************************************
+* How can we improve this (unsupervised) cluster analysis?;
+*******************************************************************************************
+/*
+(1) We did not standardize the attributes (or variable measuremnets). When the attributes are not standardize, then the clustering algorithm will focus on the variables of largest magnitude.
+
+With Standardized Variables:
+ * Prediction Accuracy for 5 Clusters = 0.58442;
+ * Prediction Accuracy for 10 Clusters = 0.59740;
+
+With Raw Variables:
+ * Prediction Accuracy for 5 Clusters = 0.63636;
+ * Prediction Accuracy for 10 Clusters = 0.74026;
+
+
+#  Dog Mandible Part 3 #
+
+proc print data = mydata.dog_mandible_measurements;run;quit;
+
+* List out class names and counts;
+proc freq data=mydata.dog_mandible_measurements; run; quit;
+tables group_name;
+run; quit;
+* note that we have 5 classes of dogs if we could count type of dog and genderr ;
+
+* strip off class identifies for clustering;
+data measurements;
+    set mydat.dog_mandible_measurements(keep=X:);
+run;
+
+proc print data=measurements; run; quit;
+
+* Transform the data measurements into principal components using PROC PRINCOMP;
+proc princomp data=measurements out=pca_scores plots=all;
+run; quit;
+
+* How many principal components should we use?;
+
+proc print data=pca_scores; run; quit;
+
+proc sort data=mydata.dog_mandible_measurements out=class_labels; by X1-X9; run; quit;
+proc sort data=pca_scores; by X1-X9; run; quit;
+
+data class labels;
+    merge class_labels pca_scores;
+    by X1-X9;
+run;
+
+proc print data =Class_labels; run; quit;
+
+* Perform Cluster Analysis using PROC CLUSTER;
+using graphics on;
+proc cluster data=class_labels method=average outtree=tree1;
+var prin1 prin2;
+run; quit;
+ods graphics off;
+
+* Pull results for 5 Clusters using PROC TREE;
+
+ods graphics on;
+proc tree data=tree1 nc1=5 out=_5_clusters;
+copy prin1 prin2;
+run; quit;
+ods graphics off;
+
+proc print data=_5_clusters run; quit;
+
+proc freq data =_10_clusters;
+tables clusname;
+run;quit;
+
+proc sort data=_10_clusters; by prin1 prin2 run; quit;
+proc sort data=class_labels out=cluster_labels; by prin1 prin2; run; quit;
+
+data cluster_fit10;
+    merge cluster_labels_10_clusters;
+    by prin prin2;
+run;
+
+proc freq data=cluster_fit10;
+tables clusname*group_name;
+run; quit;
+
+**********************************************************************
+Formalize the Cluster fits and their accuracy;
+**********************************************************************
+data predict5;
+    set cluster_fit5;
+format predicted_group $20.;
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
